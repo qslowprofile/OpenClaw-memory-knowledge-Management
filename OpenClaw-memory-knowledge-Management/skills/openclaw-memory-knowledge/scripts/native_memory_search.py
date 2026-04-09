@@ -157,8 +157,8 @@ def search_openclaw_memory(
 def _get_llm() -> Any:
     """懒加载 LLM 后端，用于 rerank_and_summarize。"""
     try:
-        from llm_backend import CatclawLLMBackend  # type: ignore
-        return CatclawLLMBackend()
+        from llm_backend import OpenClawLLMBackend  # type: ignore
+        return OpenClawLLMBackend()
     except Exception:
         class _Stub:
             def is_available(self) -> bool:

@@ -97,8 +97,8 @@ def _llm_complete(prompt: str, max_tokens: int = 200, temperature: float = 0.0) 
 def get_llm_backend_name() -> str:
     """返回当前 LLM backend 名称（供子进程报告用）。"""
     if _LLM_CALL_COUNT >= _LLM_CALL_LIMIT:
-        return "catclaw_limit_reached"
-    return "catclaw" if _get_llm().is_available() else "noop"
+        return "openclaw_limit_reached"
+    return "openclaw" if _get_llm().is_available() else "noop"
 
 
 def get_llm_status() -> Dict[str, Any]:

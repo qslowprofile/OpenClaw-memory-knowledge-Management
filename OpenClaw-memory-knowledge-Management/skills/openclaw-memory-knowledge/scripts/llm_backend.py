@@ -5,7 +5,7 @@
 - 零新 pip 依赖：仅使用 Python 标准库
 - 全部 LLM 调用为可选增强：任何失败均静默降级，不抛异常
 - 支持从 ~/.openclaw/agents/main/agent/models.json 自动发现配置
-- 支持环境变量覆盖：CATCLAW_LLM_BASE_URL / CATCLAW_LLM_API_KEY / CATCLAW_LLM_MODEL
+- 支持环境变量覆盖：OPENCLAW_LLM_BASE_URL / OPENCLAW_LLM_API_KEY / OPENCLAW_LLM_MODEL
 - SSE 流解析：处理 "data:data: " 双前缀格式
 """
 
@@ -61,15 +61,15 @@ class NoopLLMBackend(LLMBackend):
 
 
 # ──────────────────────────────────────────────
-# Catclaw 后端
+# OpenClaw LLM 后端
 # ──────────────────────────────────────────────
 
 _MODELS_JSON_DEFAULT = Path("~/.openclaw/agents/main/agent/models.json").expanduser()
 
-_CATCLAW_PROVIDER_KEY = "kubeplex-maas"
-_CATCLAW_DEFAULT_MODEL = "catclaw-proxy-model"
-_CATCLAW_DEFAULT_BASE_URL = ""  # 无内置默认值，从 models.json 或环境变量获取
-_CATCLAW_DEFAULT_API_KEY = "catpaw"
+_OPENCLAW_PROVIDER_KEY = "openclaw-llm"
+_OPENCLAW_DEFAULT_MODEL = ""
+_OPENCLAW_DEFAULT_BASE_URL = ""  # 无内置默认值，从 models.json 或环境变量获取
+_OPENCLAW_DEFAULT_API_KEY = ""
 
 
 def _load_models_json(path: Path) -> Optional[Dict[str, Any]]:
@@ -80,8 +80,8 @@ def _load_models_json(path: Path) -> Optional[Dict[str, Any]]:
         return None
 
 
-def _discover_catclaw_config() -> Optional[Dict[str, Any]]:
-    """尝试从 models.json 中读取 catclaw 配置。"""
+def _discover_openclaw_config() -> Optional[Dict[str, Any]]:
+    """尝试从 models.json 中读取 OpenClaw LLM 配置。"""
     data = _load_models_json(_MODELS_JSON_DEFAULT)
     if not isinstance(data, dict):
         return None
@@ -89,17 +89,17 @@ def _discover_catclaw_config() -> Optional[Dict[str, Any]]:
     if not isinstance(providers, dict):
         return None
 
-    # 优先查找 kubeplex-maas provider
-    provider = providers.get(_CATCLAW_PROVIDER_KEY)
+    # 优先查找 openclaw-llm provider
+    provider = providers.get(_OPENCLAW_PROVIDER_KEY)
     if not isinstance(provider, dict):
-        # 兜底：找第一个含 openai-completions api 或 catclaw base_url 的 provider
+        # 兜底：找第一个兼容 OpenAI completions 或显式声明为 openclaw 的 provider
         found = None
         for v in providers.values():
             if not isinstance(v, dict):
                 continue
             api = str(v.get("api", "")).lower()
             base_url = str(v.get("baseUrl", "") or v.get("base_url", "")).lower()
-            if "openai" in api or "catclaw" in base_url or "mmc.sankuai" in base_url:
+            if "openai" in api or "openclaw" in base_url:
                 found = v
                 break
         if found is None:
@@ -114,17 +114,17 @@ def _discover_catclaw_config() -> Optional[Dict[str, Any]]:
 
     # 从 models 列表里取第一个 model id
     models_list = provider.get("models")
-    model_id = _CATCLAW_DEFAULT_MODEL
+    model_id = _OPENCLAW_DEFAULT_MODEL
     if isinstance(models_list, list) and models_list:
         first = models_list[0]
         if isinstance(first, dict):
-            model_id = str(first.get("id") or _CATCLAW_DEFAULT_MODEL)
+            model_id = str(first.get("id") or _OPENCLAW_DEFAULT_MODEL)
         elif isinstance(first, str):
             model_id = first
 
     return {
-        "base_url": base_url or _CATCLAW_DEFAULT_BASE_URL,
-        "api_key": api_key or _CATCLAW_DEFAULT_API_KEY,
+        "base_url": base_url or _OPENCLAW_DEFAULT_BASE_URL,
+        "api_key": api_key or _OPENCLAW_DEFAULT_API_KEY,
         "model": model_id,
         "headers": dict(headers),
     }
@@ -211,34 +211,34 @@ def _parse_sse_response(body: str) -> Optional[str]:
     return None
 
 
-class CatclawLLMBackend(LLMBackend):
-    """从 models.json 自动读取配置，调用 catclaw SSE 接口。
+class OpenClawLLMBackend(LLMBackend):
+    """从 models.json 自动读取配置，调用 OpenAI-compatible SSE 接口。
 
     优先级（高→低）：
-    1. 环境变量：CATCLAW_LLM_BASE_URL / CATCLAW_LLM_API_KEY / CATCLAW_LLM_MODEL
+    1. 环境变量：OPENCLAW_LLM_BASE_URL / OPENCLAW_LLM_API_KEY / OPENCLAW_LLM_MODEL
     2. ~/.openclaw/agents/main/agent/models.json
     3. 内置默认值
     """
 
     def __init__(self) -> None:
-        cfg = _discover_catclaw_config() or {}
+        cfg = _discover_openclaw_config() or {}
 
         self._base_url: str = (
-            os.environ.get("CATCLAW_LLM_BASE_URL")
+            os.environ.get("OPENCLAW_LLM_BASE_URL")
             or cfg.get("base_url")
-            or _CATCLAW_DEFAULT_BASE_URL
+            or _OPENCLAW_DEFAULT_BASE_URL
         ).rstrip("/")
 
         self._api_key: str = (
-            os.environ.get("CATCLAW_LLM_API_KEY")
+            os.environ.get("OPENCLAW_LLM_API_KEY")
             or cfg.get("api_key")
-            or _CATCLAW_DEFAULT_API_KEY
+            or _OPENCLAW_DEFAULT_API_KEY
         )
 
         self._model: str = (
-            os.environ.get("CATCLAW_LLM_MODEL")
+            os.environ.get("OPENCLAW_LLM_MODEL")
             or cfg.get("model")
-            or _CATCLAW_DEFAULT_MODEL
+            or _OPENCLAW_DEFAULT_MODEL
         )
 
         self._extra_headers: Dict[str, str] = dict(cfg.get("headers") or {})
@@ -249,14 +249,14 @@ class CatclawLLMBackend(LLMBackend):
             import sys
             print(
                 "[llm_backend] LLM backend 未配置（base_url/api_key/model 缺失），"
-                "已回退规则模式。可通过环境变量 CATCLAW_LLM_BASE_URL / "
-                "CATCLAW_LLM_API_KEY / CATCLAW_LLM_MODEL 显式配置。",
+                "已回退规则模式。可通过环境变量 OPENCLAW_LLM_BASE_URL / "
+                "OPENCLAW_LLM_API_KEY / OPENCLAW_LLM_MODEL 显式配置。",
                 file=sys.stderr,
             )
 
     def __repr__(self) -> str:
         masked_key = (self._api_key[:4] + "****") if len(self._api_key) > 4 else "****"
-        return f"CatclawLLMBackend(model={self._model!r}, available={self._available}, key={masked_key})"
+        return f"OpenClawLLMBackend(model={self._model!r}, available={self._available}, key={masked_key})"
 
     def is_available(self) -> bool:
         return self._available
@@ -333,15 +333,15 @@ class CatclawLLMBackend(LLMBackend):
 # ──────────────────────────────────────────────
 
 def get_default_backend() -> LLMBackend:
-    """尝试初始化 CatclawLLMBackend；失败则返回 NoopLLMBackend。
+    """尝试初始化 OpenClawLLMBackend；失败则返回 NoopLLMBackend。
 
     此函数永远不抛异常，适合在任何脚本的顶层安全调用。
     """
     try:
-        backend = CatclawLLMBackend()
+        backend = OpenClawLLMBackend()
         if backend.is_available():
             return backend
-        # 已在 CatclawLLMBackend.__init__ 里打印了降级原因
+        # 已在 OpenClawLLMBackend.__init__ 里打印了降级原因
         return NoopLLMBackend()
     except Exception:
         return NoopLLMBackend()

@@ -26,9 +26,9 @@ if _SCRIPT_DIR not in sys.path:
 
 from mk_arch_core import discover_openclaw_paths
 
-# LLM backend 环境变量探测：确保子进程能继承 LLM 配置
+# LLM backend 环境变量探测：确保子进程能继承 OpenClaw LLM 配置
 try:
-    from llm_backend import _discover_catclaw_config
+    from llm_backend import _discover_openclaw_config
     _HAS_LLM_DISCOVERY = True
 except ImportError:
     _HAS_LLM_DISCOVERY = False
@@ -38,18 +38,18 @@ def _build_llm_env() -> Dict[str, str]:
     """探测 LLM 配置并构建环境变量，供子进程继承。"""
     env = dict(os.environ)
     # 如果用户已通过环境变量显式配置，直接继承
-    if env.get("CATCLAW_LLM_BASE_URL"):
+    if env.get("OPENCLAW_LLM_BASE_URL"):
         return env
     # 否则从 models.json 探测并注入环境变量
     if not _HAS_LLM_DISCOVERY:
         return env
     try:
-        cfg = _discover_catclaw_config()
+        cfg = _discover_openclaw_config()
         if cfg and cfg.get("base_url") and cfg.get("api_key"):
-            env.setdefault("CATCLAW_LLM_BASE_URL", cfg["base_url"])
-            env.setdefault("CATCLAW_LLM_API_KEY", cfg["api_key"])
+            env.setdefault("OPENCLAW_LLM_BASE_URL", cfg["base_url"])
+            env.setdefault("OPENCLAW_LLM_API_KEY", cfg["api_key"])
             if cfg.get("model"):
-                env.setdefault("CATCLAW_LLM_MODEL", cfg["model"])
+                env.setdefault("OPENCLAW_LLM_MODEL", cfg["model"])
     except Exception:
         pass
     return env
